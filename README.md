@@ -22,5 +22,13 @@ Client: \<executable code>\<Server IP Address>\<Server Port number>
 
 Server: \<executable code>\<Server Port number> 
 
+# To Compile
+Client: g++ -o client Client.cpp
+Server: g++ -o server Server.cpp
+
+# To Run
+Server: server portno
+Client: client hostname portno 
+
 # Base64 Encoding System Description
 Base64 encoding is used for sending a binary message over the internet. In this scheme, groups of 24bit are broken into four 6 bit groups and each group is encoded with an ASCII character. For binary values 0 to 25 ASCII character ‘A’ to ‘Z’ are used followed by lower case letters and the digits for binary values 26 to 51 & 52 to 61 respectively. Character ‘+’ and ‘/’ are used for binary value 62 & 63 respectively. In case the last group contains only 8 & 16 bits, then “==” & “=” sequence are appended to the end.
