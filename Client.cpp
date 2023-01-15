@@ -14,13 +14,15 @@ using namespace std;
 
 #define BUFFERSIZE 255
 
+char *doBase64Encoding(char *);
+
 int main(int argc, char **argv)
 {
 
     int sockfd, portno, n;
     struct sockaddr_in serverAddr;
     struct hostent *server;
-    char buffer[256];
+    char *buffer = (char *)malloc(BUFFERSIZE * sizeof(char));
 
     if (argc < 3)
     {
@@ -68,8 +70,10 @@ int main(int argc, char **argv)
 
     // sending msg to server
     cout << "Type your Message and press enter to send: ";
-    bzero(buffer, 256);
+    memset(buffer, 0, BUFFERSIZE * sizeof(char));
     fgets(buffer, BUFFERSIZE, stdin);
+    buffer[strcspn(buffer, "\n")] = 0; // removing newline character from input
+    buffer = doBase64Encoding(buffer); // base 64 encoding
     n = write(sockfd, buffer, strlen(buffer));
     if (n < 0)
     {
@@ -89,4 +93,57 @@ int main(int argc, char **argv)
     close(sockfd);
 
     return 0;
+}
+
+// base64 encoding
+char *doBase64Encoding(char *str)
+{
+    char base64Chars[64] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    int n = strlen(str);
+    char *encodedStr = (char *)malloc(2 * BUFFERSIZE * sizeof(char));
+    int index, characterCount, numberOfBits, asciiValue, padding;
+    int j, p, k = 0;
+
+    for (int i = 0; i < n; i += 3)
+    {
+        j = i;
+        characterCount = 0;
+        asciiValue = 0;
+
+        while (j < (i + 3) && j < n)
+        {
+            asciiValue = asciiValue << 8;
+            asciiValue = asciiValue | str[j];
+            characterCount++;
+            j++;
+        }
+
+        numberOfBits = characterCount * 8;
+        padding = numberOfBits % 3;
+
+        while (numberOfBits > 0)
+        {
+            if (numberOfBits > 6)
+            {
+                p = numberOfBits - 6;
+                index = (asciiValue >> p) & 63;
+                numberOfBits -= 6;
+            }
+            else
+            {
+                p = 6 - numberOfBits;
+                index = (asciiValue << p) & 63;
+                numberOfBits = 0;
+            }
+            encodedStr[k++] = base64Chars[index];
+        }
+    }
+
+    for (j = 0; j < padding; j++)
+    {
+        encodedStr[k++] = '=';
+    }
+    encodedStr[k] = '\0';
+
+    return encodedStr;
 }
