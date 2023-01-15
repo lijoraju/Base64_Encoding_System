@@ -24,10 +24,12 @@ Server: \<executable code>\<Server Port number>
 
 # To Compile
 Client: g++ -o client Client.cpp
+
 Server: g++ -o server Server.cpp
 
 # To Run
 Server: server portno
+
 Client: client hostname portno 
 
 # Base64 Encoding System Description
