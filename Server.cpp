@@ -64,33 +64,48 @@ int main(int argc, char **argv)
 
     cout << "Server is up\nListening for incoming connections on portno " << portno << endl;
 
-    // accepting incoming connection
-    clientlen = sizeof(clientAddr);
-    newsockfd = accept(sockfd, (struct sockaddr *)&clientAddr, &clientlen);
-    if (newsockfd < 0)
+    do
     {
-        cout << "Error accepting incoming connection" << endl;
-        exit(1);
-    }
+        // accepting new incoming connection
+        clientlen = sizeof(clientAddr);
+        newsockfd = accept(sockfd, (struct sockaddr *)&clientAddr, &clientlen);
+        if (newsockfd < 0)
+        {
+            cout << "Error accepting incoming connection" << endl;
+            exit(1);
+        }
+        cout << "Accepted new incoming connection from IP:" << inet_ntoa(clientAddr.sin_addr) << " Port:" << ntohs(clientAddr.sin_port) << endl;
 
-    cout << "Accepted incoming connection from IP:" << inet_ntoa(clientAddr.sin_addr) << " Port:" << ntohs(clientAddr.sin_port) << endl;
+        do
+        {
+            // receiving msg from client
+            bzero(buffer, sizeof(buffer));
+            n = read(newsockfd, buffer, BUFFERSIZE);
+            if (n < 0)
+            {
+                cout << "Error reading msg from client" << endl;
+                exit(1);
+            }
 
-    // sending msg from server to client
-    send(newsockfd, "Hi I'm Server", 13, 0);
+            if (buffer[0] == '3')
+            {
+                cout << "Client requested to close connection." << endl;
+                break;
+            }
 
-    // receiving msg from client
-    bzero(buffer, sizeof(buffer));
-    n = read(newsockfd, buffer, BUFFERSIZE);
-    if (n < 0)
-    {
-        cout << "Error reading msg from client" << endl;
-        exit(1);
-    }
+            cout << "New message from client: " << buffer << endl;
+            doBase64Decoding(buffer);
 
-    cout << "Message Received: " << buffer << endl;
-    doBase64Decoding(buffer);
+            // sending ACK to client on recieving Type 1 Msg
+            if (buffer[0] == '1')
+                send(newsockfd, "Message recieved", 20, 0);
+        } while (true);
 
-    close(newsockfd);
+        close(newsockfd);
+        cout << "Connection closed" << endl;
+
+    } while (true);
+
     close(sockfd);
 
     return 0;
@@ -104,7 +119,7 @@ void doBase64Decoding(char *encodedMsg)
     int asciiValue, numberOfBits;
     int j, p, k = 0;
 
-    for (int i = 0; i < n; i += 4)
+    for (int i = 1; i < n; i += 4)
     {
         j = i;
         asciiValue = 0;
@@ -159,5 +174,5 @@ void doBase64Decoding(char *encodedMsg)
     }
     decodedMsg[k] = '\0';
 
-    cout << "Decoded Message: " << decodedMsg << endl;
+    cout << "Decoded message: " << decodedMsg << endl;
 }

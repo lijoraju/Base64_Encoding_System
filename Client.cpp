@@ -14,7 +14,7 @@ using namespace std;
 
 #define BUFFERSIZE 255
 
-char *doBase64Encoding(char *);
+void doBase64Encoding(char *, char *);
 
 int main(int argc, char **argv)
 {
@@ -23,6 +23,9 @@ int main(int argc, char **argv)
     struct sockaddr_in serverAddr;
     struct hostent *server;
     char *buffer = (char *)malloc(BUFFERSIZE * sizeof(char));
+    char *msg = (char *)malloc(2 * BUFFERSIZE * sizeof(char));
+    bool isConnectionClosing = true;
+    char option;
 
     if (argc < 3)
     {
@@ -66,43 +69,74 @@ int main(int argc, char **argv)
         exit(1);
     }
 
+    isConnectionClosing = false;
     cout << "Connection successful" << endl;
+    msg[0] = '1';
 
-    // sending msg to server
-    cout << "Type your Message and press enter to send: ";
-    memset(buffer, 0, BUFFERSIZE * sizeof(char));
-    fgets(buffer, BUFFERSIZE, stdin);
-    buffer[strcspn(buffer, "\n")] = 0; // removing newline character from input
-    buffer = doBase64Encoding(buffer); // base 64 encoding
-    n = write(sockfd, buffer, strlen(buffer));
+    do
+    {
+        cout << "Type your Message and press enter to send: ";
+        memset(buffer, 0, BUFFERSIZE * sizeof(char)); // clearing buffer
+        fgets(buffer, BUFFERSIZE, stdin);             // getting msg from user
+        buffer[strcspn(buffer, "\n")] = 0;            // removing newline character from input
+        doBase64Encoding(buffer, msg);                // base 64 encoding
+
+        // sending encoded msg(Type 1) to server
+        n = write(sockfd, msg, strlen(msg));
+        if (n < 0)
+        {
+            cout << "Msg sending failed" << endl;
+            exit(1);
+        }
+
+        // receiving Ack(Type 2) from server
+        memset(buffer, 0, BUFFERSIZE * sizeof(char)); // clearing buffer
+        n = read(sockfd, buffer, BUFFERSIZE);
+        if (n < 0)
+        {
+            cout << "Error reading msg from server" << endl;
+            exit(1);
+        }
+
+        cout << "New message from server: " << buffer << endl;
+
+        cout << "Do you want to close the connection now(Y/N)?: ";
+        cin >> option;
+        cin.clear();
+        cin.ignore();
+        memset(msg, 0, 2 * BUFFERSIZE * sizeof(char)); // clearing msg
+        if (toupper(option) == 'Y')
+        {
+            msg[0] = '3';
+            isConnectionClosing = true;
+        }
+        else
+        {
+            msg[0] = '1';
+        }
+    } while (!isConnectionClosing);
+
+    // sending Type 3 msg to server
+    strcat(msg, "Closing connection");
+    n = write(sockfd, msg, strlen(msg));
     if (n < 0)
     {
-        cout << "Msg sending failed" << endl;
+        cout << "Type 3 Msg sending failed" << endl;
         exit(1);
     }
 
-    // receiving msg from server
-    bzero(buffer, 256);
-    n = read(sockfd, buffer, BUFFERSIZE);
-    if (n < 0)
-    {
-        cout << "Error reading msg from server" << endl;
-        exit(1);
-    }
-    cout << "New message received: " << buffer << endl;
     close(sockfd);
 
     return 0;
 }
 
 // base64 encoding
-char *doBase64Encoding(char *msg)
+void doBase64Encoding(char *msg, char *encodedMsg)
 {
-    char base64Chars[64] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    char base64Chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     int n = strlen(msg);
-    char *encodedMsg = (char *)malloc(2 * BUFFERSIZE * sizeof(char));
     int index, characterCount, numberOfBits, asciiValue, padding;
-    int j, p, k = 0;
+    int j, p, k = 1;
 
     for (int i = 0; i < n; i += 3)
     {
@@ -143,7 +177,6 @@ char *doBase64Encoding(char *msg)
     {
         encodedMsg[k++] = '=';
     }
-    encodedMsg[k] = '\0';
 
-    return encodedMsg;
+    encodedMsg[k] = '\0';
 }
