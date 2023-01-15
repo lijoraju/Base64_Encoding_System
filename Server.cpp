@@ -15,6 +15,8 @@ using namespace std;
 
 #define BUFFERSIZE 255
 
+void doBase64Decoding(char *);
+
 int main(int argc, char **argv)
 {
     int sockfd, newsockfd, portno;
@@ -85,10 +87,77 @@ int main(int argc, char **argv)
         exit(1);
     }
 
-    cout << "New message received: " << buffer << endl;
+    cout << "Message Received: " << buffer << endl;
+    doBase64Decoding(buffer);
 
     close(newsockfd);
     close(sockfd);
 
     return 0;
+}
+
+// base 64 decoding
+void doBase64Decoding(char *encodedMsg)
+{
+    int n = strlen(encodedMsg);
+    char *decodedMsg = (char *)malloc(BUFFERSIZE * sizeof(char));
+    int asciiValue, numberOfBits;
+    int j, p, k = 0;
+
+    for (int i = 0; i < n; i += 4)
+    {
+        j = i;
+        asciiValue = 0;
+        numberOfBits = 0;
+
+        while (j < (i + 4) && j < n)
+        {
+            if (encodedMsg[j] != '=')
+            {
+                asciiValue = asciiValue << 6;
+                numberOfBits += 6;
+
+                if (encodedMsg[j] >= 'A' && encodedMsg[j] <= 'Z')
+                {
+                    asciiValue = asciiValue | (encodedMsg[j] - 'A');
+                }
+                else if (encodedMsg[j] >= 'a' && encodedMsg[j] <= 'z')
+                {
+                    asciiValue = asciiValue | (encodedMsg[j] - 'a' + 26);
+                }
+                else if (encodedMsg[j] >= '0' && encodedMsg[j] <= '9')
+                {
+                    asciiValue = asciiValue | (encodedMsg[j] - '0' + 52);
+                }
+                else if (encodedMsg[j] == '+')
+                {
+                    asciiValue = asciiValue | 62;
+                }
+                else if (encodedMsg[j] == '/')
+                {
+                    asciiValue = asciiValue | 63;
+                }
+                else
+                {
+                    cout << "Unknown character encountered:" << encodedMsg[j] << endl;
+                }
+            }
+            else
+            {
+                asciiValue = asciiValue >> 2;
+                numberOfBits -= 2;
+            }
+            j++;
+        }
+
+        while (numberOfBits > 0)
+        {
+            p = numberOfBits - 8;
+            decodedMsg[k++] = (asciiValue >> p) & 255;
+            numberOfBits -= 8;
+        }
+    }
+    decodedMsg[k] = '\0';
+
+    cout << "Decoded Message: " << decodedMsg << endl;
 }
