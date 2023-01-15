@@ -96,11 +96,11 @@ int main(int argc, char **argv)
 }
 
 // base64 encoding
-char *doBase64Encoding(char *str)
+char *doBase64Encoding(char *msg)
 {
-    char base64Chars[64] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-    int n = strlen(str);
-    char *encodedStr = (char *)malloc(2 * BUFFERSIZE * sizeof(char));
+    char base64Chars[64] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    int n = strlen(msg);
+    char *encodedMsg = (char *)malloc(2 * BUFFERSIZE * sizeof(char));
     int index, characterCount, numberOfBits, asciiValue, padding;
     int j, p, k = 0;
 
@@ -113,7 +113,7 @@ char *doBase64Encoding(char *str)
         while (j < (i + 3) && j < n)
         {
             asciiValue = asciiValue << 8;
-            asciiValue = asciiValue | str[j];
+            asciiValue = asciiValue | msg[j];
             characterCount++;
             j++;
         }
@@ -135,15 +135,15 @@ char *doBase64Encoding(char *str)
                 index = (asciiValue << p) & 63;
                 numberOfBits = 0;
             }
-            encodedStr[k++] = base64Chars[index];
+            encodedMsg[k++] = base64Chars[index];
         }
     }
 
     for (j = 0; j < padding; j++)
     {
-        encodedStr[k++] = '=';
+        encodedMsg[k++] = '=';
     }
-    encodedStr[k] = '\0';
+    encodedMsg[k] = '\0';
 
-    return encodedStr;
+    return encodedMsg;
 }
