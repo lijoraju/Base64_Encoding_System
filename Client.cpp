@@ -126,6 +126,7 @@ int main(int argc, char **argv)
     }
 
     close(sockfd);
+    cout << "Connection closed." << endl;
 
     return 0;
 }

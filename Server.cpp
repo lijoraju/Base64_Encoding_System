@@ -24,6 +24,8 @@ int main(int argc, char **argv)
     char buffer[256];
     struct sockaddr_in serverAddr, clientAddr;
     int n;
+    pid_t pid;
+    string clientIP;
 
     if (argc < 2)
     {
@@ -74,36 +76,46 @@ int main(int argc, char **argv)
             cout << "Error accepting incoming connection" << endl;
             exit(1);
         }
-        cout << "Accepted new incoming connection from IP:" << inet_ntoa(clientAddr.sin_addr) << " Port:" << ntohs(clientAddr.sin_port) << endl;
+        clientIP = inet_ntoa(clientAddr.sin_addr);
+        clientIP = clientIP + '/';
+        clientIP = clientIP + to_string(ntohs(clientAddr.sin_port));
+        cout << "Accepted new incoming connection from IP/PortNo:" << clientIP << endl;
 
-        do
+        // creating child process to handle the connected client
+        if ((pid = fork()) == 0)
         {
-            // receiving msg from client
-            bzero(buffer, sizeof(buffer));
-            n = read(newsockfd, buffer, BUFFERSIZE);
-            if (n < 0)
+            close(sockfd); // child server process closing its listening socket
+
+            do
             {
-                cout << "Error reading msg from client" << endl;
-                exit(1);
-            }
+                // receiving msg from client
+                bzero(buffer, sizeof(buffer));
+                n = read(newsockfd, buffer, BUFFERSIZE);
+                if (n < 0)
+                {
+                    cout << "Error reading msg from client" << endl;
+                    exit(1);
+                }
 
-            if (buffer[0] == '3')
-            {
-                cout << "Client requested to close connection." << endl;
-                break;
-            }
+                if (buffer[0] == '3')
+                {
+                    cout << "Client " << clientIP << " requested to close connection." << endl;
+                    break;
+                }
 
-            cout << "New message from client: " << buffer << endl;
-            doBase64Decoding(buffer);
+                cout << "New message from client " << clientIP << ": " << buffer << endl;
+                doBase64Decoding(buffer);
 
-            // sending ACK to client on recieving Type 1 Msg
-            if (buffer[0] == '1')
-                send(newsockfd, "Message recieved", 20, 0);
-        } while (true);
+                // sending ACK to client on recieving Type 1 Msg
+                if (buffer[0] == '1')
+                    send(newsockfd, "Message recieved", 20, 0);
+            } while (true);
 
-        close(newsockfd);
-        cout << "Connection closed" << endl;
-
+            close(newsockfd);
+            cout << "Connection closed." << endl;
+            exit(0);
+        }
+        close(newsockfd); // parent server process closes connected client socket
     } while (true);
 
     close(sockfd);
