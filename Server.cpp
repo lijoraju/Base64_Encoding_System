@@ -15,6 +15,7 @@ using namespace std;
 
 #define BUFFERSIZE 255
 #define ACK "Message Received"
+#define FIN "Finished"
 
 enum ErrorCode
 {
@@ -27,6 +28,7 @@ enum ErrorCode
 
 void serverProcess(int);
 void listenClientProcesses(int);
+void closeConnectionToClient(int, string);
 void doClientCommunication(int, string);
 void doBase64Decoding(char *);
 void error(ErrorCode);
@@ -157,7 +159,7 @@ void listenClientProcesses(int sockfd)
         clientIP = clientIP + '/';
         clientIP = clientIP + to_string(ntohs(clientAddr.sin_port));
 
-        printToConsole(("\nAccepted New Incoming Connection From IP/PortNo: " + clientIP));
+        printToConsole(("\nAccepted New Incoming Connection From Client IP/PortNo: " + clientIP));
 
         // creating child process for handling client communications
         if ((pid = fork()) == 0)
@@ -175,7 +177,7 @@ void listenClientProcesses(int sockfd)
 /**
  * @brief Client-Server communications
  * @param newsockfd the new socket created for client communications
- * @param clientIP  the client IP/PortNo 
+ * @param clientIP  the client IP/PortNo
  */
 void doClientCommunication(int newsockfd, string clientIP)
 {
@@ -197,9 +199,9 @@ void doClientCommunication(int newsockfd, string clientIP)
             break;
         }
 
-        printToConsole(("\nNew Message From Client " + clientIP + "\n Recieved Message:"));
+        printToConsole(("\nNew Message Received From Client " + clientIP + "\n\nReceived Message:\n"));
 
-        printToConsole(buffer); // recieved msg from client
+        printToConsole(buffer); // received msg from client
 
         doBase64Decoding(buffer);
 
@@ -211,14 +213,48 @@ void doClientCommunication(int newsockfd, string clientIP)
 
     } while (true);
 
+    closeConnectionToClient(newsockfd, clientIP);
+}
+
+/**
+ * @brief Closing conncetion gracefully
+ * @param newsockfd the new socket created for client communications
+ */
+void closeConnectionToClient(int newsockfd, string clientIP)
+{
+    clock_t time;
+    char buffer[BUFFERSIZE];
+    bool receivedAck = false;
+
+    bzero(buffer, sizeof(buffer)); // clearing buffer before reading msg
+    send(newsockfd, ACK, 20, 0);   // send ACK to client
+    printToConsole("\nCONNECTION CLOSING: ACK Signal Send To Client " + clientIP);
+    sleep(10);
+    send(newsockfd, FIN, strlen(FIN), 0); // send FIN to client
+    printToConsole("\nCONNECTION CLOSING: FIN Signal Send To Client " + clientIP);
+    time = clock();
+
+    while ((clock() - time) < 3000)
+    {
+        if (read(newsockfd, buffer, BUFFERSIZE) != -1)
+        {
+            printToConsole("\nCONNECTION CLOSING: Last ACK Received From Client " + clientIP);
+            receivedAck = true;
+            break;
+        }
+    }
+
+    if (!receivedAck)
+        printToConsole("\nACK TIMEOUT: Last ACK From Client " + clientIP + " Not Received.");
+
     close(newsockfd);
 
-    printToConsole("Connection Closed.");
+    printToConsole("\nConnection To Client " + clientIP + " Closed.");
 }
 
 /**
  * @brief Base64 decoding
- * @param encodedMsg the recieved msg from client
+ * @param encodedMsg the received msg from client
  */
 void doBase64Decoding(char *encodedMsg)
 {
@@ -282,7 +318,7 @@ void doBase64Decoding(char *encodedMsg)
     }
     decodedMsg[k] = '\0';
 
-    printToConsole(" Original Message:");
+    printToConsole("\nOriginal Message:\n");
 
     printToConsole(decodedMsg); // original msg send by client
 }

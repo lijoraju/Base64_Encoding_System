@@ -13,6 +13,7 @@
 using namespace std;
 
 #define BUFFERSIZE 255
+#define ACK "Message Received"
 
 enum ErrorCode
 {
@@ -24,8 +25,15 @@ enum ErrorCode
     ERROR_READING_MSG,
 };
 
+enum ClosingState
+{
+    FIN_WAIT_1,
+    FIN_WAIT_2
+};
+
 void clientProcess(int, struct hostent *);
 void sendMessagesToServer(int);
+void closeConnectionToServer(int);
 void doBase64Encoding(char *, char *);
 void error(ErrorCode);
 void printToConsole(string);
@@ -151,16 +159,71 @@ void sendMessagesToServer(int sockfd)
         msg[0] = type1;
     } while (true);
 
+    closeConnectionToServer(sockfd);
+}
+
+/**
+ * @brief Closing connection gracefully
+ * @param sockfd the client socket created for communicating with server
+ */
+void closeConnectionToServer(int sockfd)
+{
+    char type3 = '3';
+    char *buffer = (char *)malloc(BUFFERSIZE * sizeof(char));
+    char *msg = (char *)malloc(2 * BUFFERSIZE * sizeof(char));
+    clock_t time;
+    ClosingState state;
+
+    memset(msg, 0, 2 * BUFFERSIZE * sizeof(char)); // clearing msg
+    msg[0] = type3;
+
     // sending Type 3 msg to server
-    strcat(msg, "Close Connection");
+    strcat(msg, "Finished");
     if (write(sockfd, msg, strlen(msg)) < 0)
     {
         error(ERROR_SENDING_MSG);
     }
 
+    printToConsole("\nType 3 Msg Send To Server");
+
+    state = FIN_WAIT_1;
+    memset(buffer, 0, BUFFERSIZE * sizeof(char)); // clearing buffer before reading msg
+
+    time = clock();
+    while (state != FIN_WAIT_2)
+    {
+        if (read(sockfd, buffer, BUFFERSIZE) > 0)
+        {
+            // receiving Ack for Type 3 msg from server
+            state = FIN_WAIT_2;
+            printToConsole("CONNECTION CLOSING: ACK Received From Server.");
+        }
+        else if ((clock() - time) > 3000)
+        {
+            // timeout not received ACK from server
+            state = FIN_WAIT_2;
+            printToConsole("ACK TIMEOUT: Not Received ACK From Server. Entered FIN_WAIT_2 State.");
+        }
+    }
+
+    memset(buffer, 0, BUFFERSIZE * sizeof(char)); // clearing buffer before reading next msg
+    time = clock();
+
+    while ((clock() - time) < 3000)
+    {
+        if (read(sockfd, buffer, BUFFERSIZE) > 0)
+        {
+            printToConsole("CONNECTION CLOSING: FIN Signal Received From Server.");
+            printToConsole("CONNECTION CLOSING: Last ACK Send To Server.");
+            send(sockfd, ACK, strlen(ACK), 0); // send ACK to server
+            break;
+        }
+    }
+
+    sleep(10);
     close(sockfd);
 
-    printToConsole("\nConnection Closed.");
+    printToConsole("Connection Closed.");
 }
 
 /**
