@@ -49,7 +49,6 @@ int main(int argc, char **argv)
 
 /**
  * @brief Error handling utility fuction
- * 
  * @param errCode the error code for which exception need to be handled
  */
 void error(ErrorCode errCode)
@@ -85,7 +84,6 @@ void error(ErrorCode errCode)
 
 /**
  * @brief Printing console output
- * 
  * @param msg the output to print
  */
 void printToConsole(string msg)
@@ -95,7 +93,6 @@ void printToConsole(string msg)
 
 /**
  * @brief Starting server process
- * 
  * @param portno the port no to which server socket to bind
  */
 void serverProcess(int portno)
@@ -137,7 +134,6 @@ void serverProcess(int portno)
 
 /**
  * @brief Listening incoming connections
- * 
  * @param sockfd the server socket which is listening the client connections
  */
 void listenClientProcesses(int sockfd)
@@ -178,7 +174,6 @@ void listenClientProcesses(int sockfd)
 
 /**
  * @brief Client-Server communications
- * 
  * @param newsockfd the new socket created for client communications
  * @param clientIP  the client IP/PortNo 
  */
@@ -223,7 +218,6 @@ void doClientCommunication(int newsockfd, string clientIP)
 
 /**
  * @brief Base64 decoding
- * 
  * @param encodedMsg the recieved msg from client
  */
 void doBase64Decoding(char *encodedMsg)
