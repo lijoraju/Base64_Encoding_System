@@ -14,44 +14,63 @@ using namespace std;
 
 #define BUFFERSIZE 255
 
+enum ErrorCode
+{
+    HOST_NAME_AND_PORT_NO_INVALID,
+    SOCKET_CREATION_FAILED,
+    HOST_NOT_VALID,
+    CONNECTION_FAILED,
+    ERROR_SENDING_MSG,
+    ERROR_READING_MSG,
+};
+
+void clientProcess(int, struct hostent *);
+void sendMessagesToServer(int);
 void doBase64Encoding(char *, char *);
+void error(ErrorCode);
+void printToConsole(string);
 
 int main(int argc, char **argv)
 {
-
-    int sockfd, portno, n;
-    struct sockaddr_in serverAddr;
+    int portno;
     struct hostent *server;
-    char *buffer = (char *)malloc(BUFFERSIZE * sizeof(char));
-    char *msg = (char *)malloc(2 * BUFFERSIZE * sizeof(char));
-    bool isConnectionClosing = true;
-    char option;
 
     if (argc < 3)
     {
-        cout << "Required hostname and port no" << endl;
-        exit(1);
+        error(HOST_NAME_AND_PORT_NO_INVALID);
     }
 
-    portno = atoi(argv[2]); // getting port no from CLI argument
+    portno = atoi(argv[2]);          // getting port no from CLI argument
+    server = gethostbyname(argv[1]); // getting server hostname
+
+    if (server == NULL)
+    {
+        error(HOST_NOT_VALID);
+    }
+
+    clientProcess(portno, server);
+
+    return 0;
+}
+
+/**
+ * @brief Starting client process
+ * @param portno the server port no
+ * @param server the server ip
+ */
+void clientProcess(int portno, struct hostent *server)
+{
+    int sockfd;
+    struct sockaddr_in serverAddr;
 
     // creating socket
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0)
     {
-        cout << "Error creating socket" << endl;
-        exit(1);
+        error(SOCKET_CREATION_FAILED);
     }
 
-    cout << "Socket creation:SUCCESS" << endl;
-
-    // getting server hostname
-    server = gethostbyname(argv[1]);
-    if (server == NULL)
-    {
-        cout << "Invalid host" << endl;
-        exit(1);
-    }
+    printToConsole("COMPLETED: Server Socket Creation.");
 
     // intializing serverAddr to NULL
     bzero((char *)&serverAddr, sizeof(serverAddr));
@@ -62,76 +81,137 @@ int main(int argc, char **argv)
     serverAddr.sin_port = htons(portno);
 
     // connecting to server
-    cout << "Connecting to server IP:" << server->h_name << " Port:" << portno << endl;
     if (connect(sockfd, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0)
     {
-        cout << "Error connecting to server" << endl;
-        exit(1);
+        error(CONNECTION_FAILED);
     }
 
-    isConnectionClosing = false;
-    cout << "Connection successful" << endl;
-    msg[0] = '1';
+    printToConsole("COMPLETED: Connecting To Server.");
+
+    sendMessagesToServer(sockfd);
+}
+
+/**
+ * @brief Client-Server communication
+ * @param sockfd the client socket created for communicating with server
+ */
+void sendMessagesToServer(int sockfd)
+{
+    char *buffer = (char *)malloc(BUFFERSIZE * sizeof(char));
+    char *msg = (char *)malloc(2 * BUFFERSIZE * sizeof(char));
+    char option;
+    char type1 = '1', type3 = '3';
+
+    msg[0] = type1;
 
     do
     {
-        cout << "Type your Message and press enter to send: ";
         memset(buffer, 0, BUFFERSIZE * sizeof(char)); // clearing buffer
-        fgets(buffer, BUFFERSIZE, stdin);             // getting msg from user
-        buffer[strcspn(buffer, "\n")] = 0;            // removing newline character from input
-        doBase64Encoding(buffer, msg);                // base 64 encoding
+
+        printToConsole("\nType your Message and press enter to send: ");
+
+        fgets(buffer, BUFFERSIZE, stdin); // getting msg from user
+
+        buffer[strcspn(buffer, "\n")] = 0; // removing newline character from input
+
+        doBase64Encoding(buffer, msg); // base 64 encoding
 
         // sending encoded msg(Type 1) to server
-        n = write(sockfd, msg, strlen(msg));
-        if (n < 0)
+        if (write(sockfd, msg, strlen(msg)) < 0)
         {
-            cout << "Msg sending failed" << endl;
-            exit(1);
+            error(ERROR_SENDING_MSG);
         }
+
+        memset(buffer, 0, BUFFERSIZE * sizeof(char)); // clearing buffer before reading msg
 
         // receiving Ack(Type 2) from server
-        memset(buffer, 0, BUFFERSIZE * sizeof(char)); // clearing buffer
-        n = read(sockfd, buffer, BUFFERSIZE);
-        if (n < 0)
+        if (read(sockfd, buffer, BUFFERSIZE) < 0)
         {
-            cout << "Error reading msg from server" << endl;
-            exit(1);
+            error(ERROR_READING_MSG);
         }
 
-        cout << "New message from server: " << buffer << endl;
+        printToConsole("\nNew message from server:");
 
-        cout << "Do you want to close the connection now(Y/N)?: ";
+        printToConsole(buffer);
+
+        printToConsole("\nDo you want to close the connection now?.(Y/N)");
+
         cin >> option;
         cin.clear();
         cin.ignore();
+
         memset(msg, 0, 2 * BUFFERSIZE * sizeof(char)); // clearing msg
+
         if (toupper(option) == 'Y')
         {
-            msg[0] = '3';
-            isConnectionClosing = true;
+            msg[0] = type3;
+            break;
         }
-        else
-        {
-            msg[0] = '1';
-        }
-    } while (!isConnectionClosing);
+
+        msg[0] = type1;
+    } while (true);
 
     // sending Type 3 msg to server
-    strcat(msg, "Closing connection");
-    n = write(sockfd, msg, strlen(msg));
-    if (n < 0)
+    strcat(msg, "Close Connection");
+    if (write(sockfd, msg, strlen(msg)) < 0)
     {
-        cout << "Type 3 Msg sending failed" << endl;
-        exit(1);
+        error(ERROR_SENDING_MSG);
     }
 
     close(sockfd);
-    cout << "Connection closed." << endl;
 
-    return 0;
+    printToConsole("\nConnection Closed.");
 }
 
-// base64 encoding
+/**
+ * @brief Error handling utility fuction
+ * @param errCode the error code for which exception need to be handled
+ */
+void error(ErrorCode errCode)
+{
+    string errorMsg;
+
+    switch (errCode)
+    {
+    case HOST_NAME_AND_PORT_NO_INVALID:
+        errorMsg = "ERROR: Invalid Host Name and Port No.";
+        break;
+    case SOCKET_CREATION_FAILED:
+        errorMsg = "ERROR: Socket Creation Failed.";
+        break;
+    case CONNECTION_FAILED:
+        errorMsg = "ERROR: Server Connection Failed.";
+        break;
+    case ERROR_SENDING_MSG:
+        errorMsg = "ERROR: Sending Message To Server.";
+        break;
+    case ERROR_READING_MSG:
+        errorMsg = "ERROR: Reading Message From Server.";
+        break;
+
+    default:
+        break;
+    }
+
+    printToConsole(errorMsg);
+
+    exit(1);
+}
+
+/**
+ * @brief Printing console output
+ * @param msg the output to print
+ */
+void printToConsole(string msg)
+{
+    cout << msg << endl;
+}
+
+/**
+ * @brief Base64 encoding
+ * @param msg original message
+ * @param encodedMsg encoded msg to send
+ */
 void doBase64Encoding(char *msg, char *encodedMsg)
 {
     char base64Chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";

@@ -14,7 +14,7 @@
 using namespace std;
 
 #define BUFFERSIZE 255
-#define ACK "Message Received."
+#define ACK "Message Received"
 
 enum ErrorCode
 {
