@@ -12,17 +12,18 @@
 
 using namespace std;
 
-#define BUFFERSIZE 255
+#define BUFFERSIZE 1024
 #define ACK "Message Received"
 
 enum ErrorCode
 {
     HOST_NAME_AND_PORT_NO_INVALID,
     SOCKET_CREATION_FAILED,
-    HOST_NOT_VALID,
     CONNECTION_FAILED,
+    HOST_NOT_VALID,
     ERROR_SENDING_MSG,
     ERROR_READING_MSG,
+    PORT_NO_INVALID
 };
 
 enum ClosingState
@@ -32,7 +33,7 @@ enum ClosingState
 };
 
 void clientProcess(int, struct hostent *);
-void sendMessagesToServer(int);
+void doClientServerCommunications(int);
 void closeConnectionToServer(int);
 void doBase64Encoding(char *, char *);
 void error(ErrorCode);
@@ -50,6 +51,11 @@ int main(int argc, char **argv)
 
     portno = atoi(argv[2]);          // getting port no from CLI argument
     server = gethostbyname(argv[1]); // getting server hostname
+
+    if (portno < 0 || portno > 65534)
+    {
+        error(PORT_NO_INVALID);
+    }
 
     if (server == NULL)
     {
@@ -96,14 +102,14 @@ void clientProcess(int portno, struct hostent *server)
 
     printToConsole("COMPLETED: Connecting To Server.");
 
-    sendMessagesToServer(sockfd);
+    doClientServerCommunications(sockfd);
 }
 
 /**
  * @brief Client-Server communication
  * @param sockfd the client socket created for communicating with server
  */
-void sendMessagesToServer(int sockfd)
+void doClientServerCommunications(int sockfd)
 {
     char *buffer = (char *)malloc(BUFFERSIZE * sizeof(char));
     char *msg = (char *)malloc(2 * BUFFERSIZE * sizeof(char));
@@ -125,7 +131,7 @@ void sendMessagesToServer(int sockfd)
         doBase64Encoding(buffer, msg); // base 64 encoding
 
         // sending encoded msg(Type 1) to server
-        if (write(sockfd, msg, strlen(msg)) < 0)
+        if (write(sockfd, msg, strlen(msg)) <= 0)
         {
             error(ERROR_SENDING_MSG);
         }
@@ -133,7 +139,7 @@ void sendMessagesToServer(int sockfd)
         memset(buffer, 0, BUFFERSIZE * sizeof(char)); // clearing buffer before reading msg
 
         // receiving Ack(Type 2) from server
-        if (read(sockfd, buffer, BUFFERSIZE) < 0)
+        if (read(sockfd, buffer, BUFFERSIZE) <= 0)
         {
             error(ERROR_READING_MSG);
         }
@@ -220,7 +226,7 @@ void closeConnectionToServer(int sockfd)
         }
     }
 
-    sleep(10);
+    sleep(5);
     close(sockfd);
 
     printToConsole("Connection Closed.");
@@ -250,6 +256,12 @@ void error(ErrorCode errCode)
         break;
     case ERROR_READING_MSG:
         errorMsg = "ERROR: Reading Message From Server.";
+        break;
+    case PORT_NO_INVALID:
+        errorMsg = "ERROR: Invalid Port No.";
+        break;
+    case HOST_NOT_VALID:
+        errorMsg = "ERROR: Host Not Valid.";
         break;
 
     default:

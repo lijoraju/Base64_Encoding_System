@@ -13,7 +13,7 @@
 
 using namespace std;
 
-#define BUFFERSIZE 255
+#define BUFFERSIZE 1024
 #define ACK "Message Received"
 #define FIN "Finished"
 
@@ -29,7 +29,7 @@ enum ErrorCode
 void serverProcess(int);
 void listenClientProcesses(int);
 void closeConnectionToClient(int, string);
-void doClientCommunication(int, string);
+void doClientServerCommunications(int, string);
 void doBase64Decoding(char *);
 void error(ErrorCode);
 void printToConsole(string);
@@ -43,6 +43,11 @@ int main(int argc, char **argv)
     }
 
     portno = atoi(argv[1]); // getting port no as CLI argument
+
+    if (portno < 0 || portno > 65534)
+    {
+        error(PORT_NO_INVALID);
+    }
 
     serverProcess(portno);
 
@@ -127,7 +132,7 @@ void serverProcess(int portno)
 
     printToConsole("COMPLETED: Server Socket Binding.");
 
-    listen(sockfd, 10); // No of concurrent connections is restricted to 10
+    listen(sockfd, 5); // No of concurrent connections is restricted to 10
 
     printToConsole(("\nServer Is Up And Running.\nListening Incoming Connections On Port No " + to_string(portno)));
 
@@ -166,7 +171,7 @@ void listenClientProcesses(int sockfd)
         {
             // child process
             close(sockfd); // closing its listening socket
-            doClientCommunication(newsockfd, clientIP);
+            doClientServerCommunications(newsockfd, clientIP);
             exit(0);
         }
         close(newsockfd); // parent process closes its connected client socket
@@ -179,7 +184,7 @@ void listenClientProcesses(int sockfd)
  * @param newsockfd the new socket created for client communications
  * @param clientIP  the client IP/PortNo
  */
-void doClientCommunication(int newsockfd, string clientIP)
+void doClientServerCommunications(int newsockfd, string clientIP)
 {
     char buffer[BUFFERSIZE];
 
@@ -187,7 +192,7 @@ void doClientCommunication(int newsockfd, string clientIP)
     {
         bzero(buffer, sizeof(buffer)); // clearing buffer before reading msg
 
-        if (read(newsockfd, buffer, BUFFERSIZE) < 0)
+        if (read(newsockfd, buffer, BUFFERSIZE) <= 0)
         {
             error(ERROR_READING_MSG);
         }
@@ -208,7 +213,7 @@ void doClientCommunication(int newsockfd, string clientIP)
         if (buffer[0] == '1')
         {
             // sending ACK to client on recieving Type 1 Msg
-            send(newsockfd, ACK, 20, 0);
+            send(newsockfd, ACK, strlen(ACK), 0);
         }
 
     } while (true);
@@ -226,8 +231,8 @@ void closeConnectionToClient(int newsockfd, string clientIP)
     char buffer[BUFFERSIZE];
     bool receivedAck = false;
 
-    bzero(buffer, sizeof(buffer)); // clearing buffer before reading msg
-    send(newsockfd, ACK, 20, 0);   // send ACK to client
+    bzero(buffer, sizeof(buffer));        // clearing buffer before reading msg
+    send(newsockfd, ACK, strlen(ACK), 0); // send ACK to client
     printToConsole("\nCONNECTION CLOSING: ACK Signal Send To Client " + clientIP);
     sleep(10);
     send(newsockfd, FIN, strlen(FIN), 0); // send FIN to client
