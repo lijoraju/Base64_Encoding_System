@@ -25,115 +25,33 @@ enum ErrorCode
     ERROR_READING_MSG,
 };
 
+void serverProcess(int);
+void listenClientProcesses(int);
+void doClientCommunication(int, string);
 void doBase64Decoding(char *);
 void error(ErrorCode);
 void printToConsole(string);
 
 int main(int argc, char **argv)
 {
-    int sockfd, newsockfd, portno;
-    socklen_t clientlen;
-    char buffer[256];
-    struct sockaddr_in serverAddr, clientAddr;
-    int n;
-    pid_t pid;
-    string clientIP;
-
+    int portno;
     if (argc < 2)
     {
         error(PORT_NO_INVALID);
     }
 
-    // creating socket
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd < 0)
-    {
-        error(SOCKET_CREATION_FAILED);
-    }
-
-    printToConsole("COMPLETED: Server Socket Creation.");
-
-    // initializing serverAddr to null value
-    bzero((char *)&serverAddr, sizeof(serverAddr));
     portno = atoi(argv[1]); // getting port no as CLI argument
 
-    // setting serverAddr parameters
-    serverAddr.sin_family = AF_INET;
-    serverAddr.sin_addr.s_addr = INADDR_ANY;
-    serverAddr.sin_port = htons(portno);
-
-    // binding the socket to portno
-    if (bind(sockfd, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0)
-    {
-        error(SOCKET_BINDING_FAILED);
-    }
-
-    printToConsole("COMPLETED: Server Socket Binding.");
-
-    // listening incoming connections
-    listen(sockfd, 10);
-
-    printToConsole(("\nServer Is Up And Running.\nListening Incoming Connections On Port No " + to_string(portno)));
-
-    do
-    {
-        // accepting new incoming connection
-        clientlen = sizeof(clientAddr);
-        newsockfd = accept(sockfd, (struct sockaddr *)&clientAddr, &clientlen);
-        if (newsockfd < 0)
-        {
-            error(CONNECTION_ACCEPTING_FAILED);
-        }
-        clientIP = inet_ntoa(clientAddr.sin_addr);
-        clientIP = clientIP + '/';
-        clientIP = clientIP + to_string(ntohs(clientAddr.sin_port));
-        printToConsole(("\nAccepted New Incoming Connection From IP/PortNo: " + clientIP));
-
-        // creating child process to handle the connected client
-        if ((pid = fork()) == 0)
-        {
-            close(sockfd); // child server process closing its listening socket
-
-            do
-            {
-                // receiving msg from client
-                bzero(buffer, sizeof(buffer));
-                n = read(newsockfd, buffer, BUFFERSIZE);
-                if (n < 0)
-                {
-                    error(ERROR_READING_MSG);
-                }
-
-                if (buffer[0] == '3')
-                {
-                    printToConsole(("\nClient " + clientIP + " Requested To Close Connection."));
-                    break;
-                }
-
-                printToConsole(("\nNew Message From Client " + clientIP + ":"));
-                printToConsole(buffer);
-                doBase64Decoding(buffer);
-
-                // sending ACK to client on recieving Type 1 Msg
-                if (buffer[0] == '1')
-                    send(newsockfd, ACK, 20, 0);
-            } while (true);
-
-            close(newsockfd);
-            printToConsole("Connection Closed.");
-            exit(0);
-        }
-        close(newsockfd); // parent server process closes connected client socket
-    } while (true);
-
-    close(sockfd);
+    serverProcess(portno);
 
     return 0;
 }
 
-// utility functions
-
-// error handling
+/**
+ * @brief Error handling utility fuction
+ * 
+ * @param errCode the error code for which exception need to be handled
+ */
 void error(ErrorCode errCode)
 {
     string errorMsg;
@@ -161,16 +79,153 @@ void error(ErrorCode errCode)
     }
 
     printToConsole(errorMsg);
+
     exit(1);
 }
 
-// printing on console
+/**
+ * @brief Printing console output
+ * 
+ * @param msg the output to print
+ */
 void printToConsole(string msg)
 {
     cout << msg << endl;
 }
 
-// base 64 decoding
+/**
+ * @brief Starting server process
+ * 
+ * @param portno the port no to which server socket to bind
+ */
+void serverProcess(int portno)
+{
+    int sockfd;
+    struct sockaddr_in serverAddr;
+
+    // creating the socket
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd < 0)
+    {
+        error(SOCKET_CREATION_FAILED);
+    }
+
+    printToConsole("COMPLETED: Server Socket Creation.");
+
+    // initializing serverAddr to null value
+    bzero((char *)&serverAddr, sizeof(serverAddr));
+
+    // setting serverAddr parameters
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_addr.s_addr = INADDR_ANY;
+    serverAddr.sin_port = htons(portno);
+
+    // binding the socket
+    if (bind(sockfd, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0)
+    {
+        error(SOCKET_BINDING_FAILED);
+    }
+
+    printToConsole("COMPLETED: Server Socket Binding.");
+
+    listen(sockfd, 10); // No of concurrent connections is restricted to 10
+
+    printToConsole(("\nServer Is Up And Running.\nListening Incoming Connections On Port No " + to_string(portno)));
+
+    listenClientProcesses(sockfd);
+}
+
+/**
+ * @brief Listening incoming connections
+ * 
+ * @param sockfd the server socket which is listening the client connections
+ */
+void listenClientProcesses(int sockfd)
+{
+    int newsockfd;
+    socklen_t clientlen;
+    struct sockaddr_in clientAddr;
+    string clientIP;
+    pid_t pid;
+
+    do
+    {
+        // accepting new incoming connection
+        clientlen = sizeof(clientAddr);
+        newsockfd = accept(sockfd, (struct sockaddr *)&clientAddr, &clientlen);
+        if (newsockfd < 0)
+        {
+            error(CONNECTION_ACCEPTING_FAILED);
+        }
+        clientIP = inet_ntoa(clientAddr.sin_addr);
+        clientIP = clientIP + '/';
+        clientIP = clientIP + to_string(ntohs(clientAddr.sin_port));
+
+        printToConsole(("\nAccepted New Incoming Connection From IP/PortNo: " + clientIP));
+
+        // creating child process for handling client communications
+        if ((pid = fork()) == 0)
+        {
+            // child process
+            close(sockfd); // closing its listening socket
+            doClientCommunication(newsockfd, clientIP);
+            exit(0);
+        }
+        close(newsockfd); // parent process closes its connected client socket
+
+    } while (true);
+}
+
+/**
+ * @brief Client-Server communications
+ * 
+ * @param newsockfd the new socket created for client communications
+ * @param clientIP  the client IP/PortNo 
+ */
+void doClientCommunication(int newsockfd, string clientIP)
+{
+    char buffer[BUFFERSIZE];
+
+    do
+    {
+        bzero(buffer, sizeof(buffer)); // clearing buffer before reading msg
+
+        if (read(newsockfd, buffer, BUFFERSIZE) < 0)
+        {
+            error(ERROR_READING_MSG);
+        }
+
+        if (buffer[0] == '3')
+        {
+            // client has send Type 3 msg
+            printToConsole(("\nClient " + clientIP + " Requested To Close Connection."));
+            break;
+        }
+
+        printToConsole(("\nNew Message From Client " + clientIP + "\n Recieved Message:"));
+
+        printToConsole(buffer); // recieved msg from client
+
+        doBase64Decoding(buffer);
+
+        if (buffer[0] == '1')
+        {
+            // sending ACK to client on recieving Type 1 Msg
+            send(newsockfd, ACK, 20, 0);
+        }
+
+    } while (true);
+
+    close(newsockfd);
+
+    printToConsole("Connection Closed.");
+}
+
+/**
+ * @brief Base64 decoding
+ * 
+ * @param encodedMsg the recieved msg from client
+ */
 void doBase64Decoding(char *encodedMsg)
 {
     int n = strlen(encodedMsg);
@@ -233,6 +288,7 @@ void doBase64Decoding(char *encodedMsg)
     }
     decodedMsg[k] = '\0';
 
-    printToConsole("Message Decoded.");
-    printToConsole(decodedMsg);
+    printToConsole(" Original Message:");
+
+    printToConsole(decodedMsg); // original msg send by client
 }
