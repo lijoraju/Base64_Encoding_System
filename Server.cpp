@@ -14,8 +14,20 @@
 using namespace std;
 
 #define BUFFERSIZE 255
+#define ACK "Message Received."
+
+enum ErrorCode
+{
+    PORT_NO_INVALID,
+    SOCKET_CREATION_FAILED,
+    SOCKET_BINDING_FAILED,
+    CONNECTION_ACCEPTING_FAILED,
+    ERROR_READING_MSG,
+};
 
 void doBase64Decoding(char *);
+void error(ErrorCode);
+void printToConsole(string);
 
 int main(int argc, char **argv)
 {
@@ -29,19 +41,17 @@ int main(int argc, char **argv)
 
     if (argc < 2)
     {
-        cout << "Port No Invalid" << endl;
-        exit(1);
+        error(PORT_NO_INVALID);
     }
 
     // creating socket
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0)
     {
-        cout << "Error Creating Socket" << endl;
-        exit(1);
+        error(SOCKET_CREATION_FAILED);
     }
 
-    cout << "Server socket creation:SUCCESS" << endl;
+    printToConsole("COMPLETED: Server Socket Creation.");
 
     // initializing serverAddr to null value
     bzero((char *)&serverAddr, sizeof(serverAddr));
@@ -55,16 +65,15 @@ int main(int argc, char **argv)
     // binding the socket to portno
     if (bind(sockfd, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0)
     {
-        cout << "Error on binding" << endl;
-        exit(1);
+        error(SOCKET_BINDING_FAILED);
     }
 
-    cout << "Server socket binding:SUCCESS" << endl;
+    printToConsole("COMPLETED: Server Socket Binding.");
 
     // listening incoming connections
     listen(sockfd, 10);
 
-    cout << "Server is up\nListening for incoming connections on portno " << portno << endl;
+    printToConsole(("\nServer Is Up And Running.\nListening Incoming Connections On Port No " + to_string(portno)));
 
     do
     {
@@ -73,13 +82,12 @@ int main(int argc, char **argv)
         newsockfd = accept(sockfd, (struct sockaddr *)&clientAddr, &clientlen);
         if (newsockfd < 0)
         {
-            cout << "Error accepting incoming connection" << endl;
-            exit(1);
+            error(CONNECTION_ACCEPTING_FAILED);
         }
         clientIP = inet_ntoa(clientAddr.sin_addr);
         clientIP = clientIP + '/';
         clientIP = clientIP + to_string(ntohs(clientAddr.sin_port));
-        cout << "Accepted new incoming connection from IP/PortNo:" << clientIP << endl;
+        printToConsole(("\nAccepted New Incoming Connection From IP/PortNo: " + clientIP));
 
         // creating child process to handle the connected client
         if ((pid = fork()) == 0)
@@ -93,26 +101,26 @@ int main(int argc, char **argv)
                 n = read(newsockfd, buffer, BUFFERSIZE);
                 if (n < 0)
                 {
-                    cout << "Error reading msg from client" << endl;
-                    exit(1);
+                    error(ERROR_READING_MSG);
                 }
 
                 if (buffer[0] == '3')
                 {
-                    cout << "Client " << clientIP << " requested to close connection." << endl;
+                    printToConsole(("\nClient " + clientIP + " Requested To Close Connection."));
                     break;
                 }
 
-                cout << "New message from client " << clientIP << ": " << buffer << endl;
+                printToConsole(("\nNew Message From Client " + clientIP + ":"));
+                printToConsole(buffer);
                 doBase64Decoding(buffer);
 
                 // sending ACK to client on recieving Type 1 Msg
                 if (buffer[0] == '1')
-                    send(newsockfd, "Message recieved", 20, 0);
+                    send(newsockfd, ACK, 20, 0);
             } while (true);
 
             close(newsockfd);
-            cout << "Connection closed." << endl;
+            printToConsole("Connection Closed.");
             exit(0);
         }
         close(newsockfd); // parent server process closes connected client socket
@@ -121,6 +129,45 @@ int main(int argc, char **argv)
     close(sockfd);
 
     return 0;
+}
+
+// utility functions
+
+// error handling
+void error(ErrorCode errCode)
+{
+    string errorMsg;
+
+    switch (errCode)
+    {
+    case PORT_NO_INVALID:
+        errorMsg = "ERROR: Invalid Port No.";
+        break;
+    case SOCKET_CREATION_FAILED:
+        errorMsg = "ERROR: Socket Creation Failed.";
+        break;
+    case SOCKET_BINDING_FAILED:
+        errorMsg = "ERROR: Socket Binding Failed.";
+        break;
+    case CONNECTION_ACCEPTING_FAILED:
+        errorMsg = "ERROR: Acccepting Conncetion Failed.";
+        break;
+    case ERROR_READING_MSG:
+        errorMsg = "ERROR: Reading Message From Client.";
+        break;
+
+    default:
+        break;
+    }
+
+    printToConsole(errorMsg);
+    exit(1);
+}
+
+// printing on console
+void printToConsole(string msg)
+{
+    cout << msg << endl;
 }
 
 // base 64 decoding
@@ -166,7 +213,7 @@ void doBase64Decoding(char *encodedMsg)
                 }
                 else
                 {
-                    cout << "Unknown character encountered:" << encodedMsg[j] << endl;
+                    printToConsole(("ERROR: Unable To Decode " + encodedMsg[j]));
                 }
             }
             else
@@ -186,5 +233,6 @@ void doBase64Decoding(char *encodedMsg)
     }
     decodedMsg[k] = '\0';
 
-    cout << "Decoded message: " << decodedMsg << endl;
+    printToConsole("Message Decoded.");
+    printToConsole(decodedMsg);
 }
