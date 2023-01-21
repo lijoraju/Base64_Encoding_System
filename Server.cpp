@@ -234,7 +234,7 @@ void closeConnectionToClient(int newsockfd, string clientIP)
     bzero(buffer, sizeof(buffer));        // clearing buffer before reading msg
     send(newsockfd, ACK, strlen(ACK), 0); // send ACK to client
     printToConsole("\nCONNECTION CLOSING: ACK Signal Send To Client " + clientIP);
-    sleep(10);
+    sleep(5);
     send(newsockfd, FIN, strlen(FIN), 0); // send FIN to client
     printToConsole("\nCONNECTION CLOSING: FIN Signal Send To Client " + clientIP);
     time = clock();
