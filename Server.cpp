@@ -16,6 +16,11 @@ using namespace std;
 #define BUFFERSIZE 1024
 #define ACK "Message Received"
 #define FIN "Finished"
+#define TYPE1 '1'
+#define TYPE2 '2'
+#define TYPE3 '3'
+#define WAIT_TIME 5
+#define TIMEOUT 3000
 
 enum ErrorCode
 {
@@ -198,7 +203,7 @@ void doClientServerCommunications(int newsockfd, string clientIP)
             error(ERROR_READING_MSG);
         }
 
-        if (buffer[0] == '3')
+        if (buffer[0] == TYPE3)
         {
             // client has send Type 3 msg
             printToConsole(("\nClient " + clientIP + " Requested To Close Connection."));
@@ -211,7 +216,7 @@ void doClientServerCommunications(int newsockfd, string clientIP)
 
         doBase64Decoding(buffer);
 
-        if (buffer[0] == '1')
+        if (buffer[0] == TYPE1)
         {
             // sending ACK to client on recieving Type 1 Msg
             send(newsockfd, ACK, strlen(ACK), 0);
@@ -235,12 +240,12 @@ void closeConnectionToClient(int newsockfd, string clientIP)
     bzero(buffer, sizeof(buffer));        // clearing buffer before reading msg
     send(newsockfd, ACK, strlen(ACK), 0); // send ACK to client
     printToConsole("\nCONNECTION CLOSING: ACK Signal Send To Client " + clientIP);
-    sleep(5);
+    sleep(WAIT_TIME);
     send(newsockfd, FIN, strlen(FIN), 0); // send FIN to client
     printToConsole("\nCONNECTION CLOSING: FIN Signal Send To Client " + clientIP);
     time = clock();
 
-    while ((clock() - time) < 3000)
+    while ((clock() - time) < TIMEOUT)
     {
         if (read(newsockfd, buffer, BUFFERSIZE) > 0)
         {
