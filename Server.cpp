@@ -132,7 +132,7 @@ void serverProcess(int portno)
 
     printToConsole("COMPLETED: Server Socket Binding.");
 
-    listen(sockfd, 5); // No of concurrent connections is restricted to 10
+    listen(sockfd, 10); // second arg is queue length
 
     printToConsole(("\nServer Is Up And Running.\nListening Incoming Connections On Port No " + to_string(portno)));
 
