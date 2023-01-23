@@ -77,7 +77,7 @@ void error(ErrorCode errCode)
         errorMsg = "ERROR: Acccepting Conncetion Failed.";
         break;
     case ERROR_READING_MSG:
-        errorMsg = "ERROR: Reading Message From Client.";
+        errorMsg = "ERROR: Receiving Message From Client.";
         break;
 
     default:
@@ -194,6 +194,7 @@ void doClientServerCommunications(int newsockfd, string clientIP)
 
         if (read(newsockfd, buffer, BUFFERSIZE) <= 0)
         {
+            printToConsole("Client: " + clientIP);
             error(ERROR_READING_MSG);
         }
 
@@ -241,7 +242,7 @@ void closeConnectionToClient(int newsockfd, string clientIP)
 
     while ((clock() - time) < 3000)
     {
-        if (read(newsockfd, buffer, BUFFERSIZE) != -1)
+        if (read(newsockfd, buffer, BUFFERSIZE) > 0)
         {
             printToConsole("\nCONNECTION CLOSING: Last ACK Received From Client " + clientIP);
             receivedAck = true;
