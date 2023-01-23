@@ -17,8 +17,8 @@ using namespace std;
 #define TYPE1 '1'
 #define TYPE2 '2'
 #define TYPE3 '3'
-#define WAIT_TIME 5
-#define TIMEOUT 3000
+#define WAIT_TIME 5  // in seconds
+#define TIMEOUT 3000 // in milli seconds
 
 enum ErrorCode
 {
