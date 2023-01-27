@@ -34,7 +34,8 @@ enum ErrorCode
 enum ClosingState
 {
     FIN_WAIT_1,
-    FIN_WAIT_2
+    FIN_WAIT_2,
+    CLOSED
 };
 
 void clientProcess(int, struct hostent *);
@@ -281,6 +282,7 @@ void closeConnectionToServer(int sockfd)
 
     sleep(WAIT_TIME);
     close(sockfd);
+    state = CLOSED;
 
     printToConsole("Connection Closed.");
 }
